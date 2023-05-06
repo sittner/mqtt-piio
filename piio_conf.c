@@ -32,10 +32,14 @@ static cfg_opt_t rollsh_opts[] = {
   CFG_END()
 };
 
+#define SECT_MQTT   "mqtt"
+#define SECT_SWITCH "switch"
+#define SECT_ROLLSH "rollershutter"
+
 static cfg_opt_t opts[] = {
-  CFG_SEC("mqtt", mqtt_opts, CFGF_NONE),
-  CFG_SEC("switch", switch_opts, CFGF_MULTI | CFGF_TITLE),
-  CFG_SEC("rollershutter", rollsh_opts, CFGF_MULTI | CFGF_TITLE),
+  CFG_SEC(SECT_MQTT, mqtt_opts, CFGF_NONE),
+  CFG_SEC(SECT_SWITCH, switch_opts, CFGF_MULTI | CFGF_TITLE),
+  CFG_SEC(SECT_ROLLSH, rollsh_opts, CFGF_MULTI | CFGF_TITLE),
   CFG_END()
 };
 
@@ -79,7 +83,7 @@ int piio_conf_load(const char *file) {
     goto fail1;
   }
 
-  mqtt_cfg = cfg_getsec(cfg, "mqtt");
+  mqtt_cfg = cfg_getsec(cfg, SECT_MQTT);
   if (mqtt_cfg == NULL) {
     syslog(LOG_ERR, "ERROR: no mqtt config found in %s.", file);
     goto fail2;
@@ -87,18 +91,18 @@ int piio_conf_load(const char *file) {
 
   mqtt_configure(mqtt_cfg);
 
-  piio_conf_switch_count = cfg_size(cfg, "switch");
+  piio_conf_switch_count = cfg_size(cfg, SECT_SWITCH);
   piio_conf_switch = calloc(piio_conf_switch_count, sizeof(SWITCH_DATA_T));
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    if (switch_init(cfg_getnsec(cfg, "switch", i), sw) < 0) {
+    if (switch_init(cfg_getnsec(cfg, SECT_SWITCH, i), sw) < 0) {
       goto fail2;
     }
   }
 
-  piio_conf_rollsh_count = cfg_size(cfg, "rollershutter");
+  piio_conf_rollsh_count = cfg_size(cfg, SECT_ROLLSH);
   piio_conf_rollsh = calloc(piio_conf_rollsh_count, sizeof(ROLLSH_DATA_T));
   for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    if (rollsh_init(cfg_getnsec(cfg, "rollshutter", i), rollsh) < 0) {
+    if (rollsh_init(cfg_getnsec(cfg, SECT_ROLLSH, i), rollsh) < 0) {
       goto fail2;
     }
   }
@@ -127,7 +131,7 @@ void piio_conf_cleanup(void) {
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
     switch_cleanup(sw);
   }
-  free((void *) piio_conf_rollsh);
+  free((void *) piio_conf_switch);
 
   mqtt_unconfigure();
 }
