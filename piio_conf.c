@@ -1,5 +1,7 @@
 #include "piio_conf.h"
 
+#include "mqtt.h"
+
 #include <confuse.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +23,7 @@ static cfg_opt_t switch_opts[] = {
   CFG_END()
 };
 
-static cfg_opt_t rollershutter_opts[] = {
+static cfg_opt_t rollsh_opts[] = {
   CFG_INT("gpio_up", 1, CFGF_NONE),
   CFG_INT("gpio_down", 2, CFGF_NONE),
   CFG_INT("time_full", 10000, CFGF_NONE),
@@ -33,41 +35,29 @@ static cfg_opt_t rollershutter_opts[] = {
 static cfg_opt_t opts[] = {
   CFG_SEC("mqtt", mqtt_opts, CFGF_NONE),
   CFG_SEC("switch", switch_opts, CFGF_MULTI | CFGF_TITLE),
-  CFG_SEC("rollershutter", rollershutter_opts, CFGF_MULTI | CFGF_TITLE),
+  CFG_SEC("rollershutter", rollsh_opts, CFGF_MULTI | CFGF_TITLE),
   CFG_END()
 };
-
-const MQTT_CONF_DATA_T *piio_conf_mqtt;
 
 SWITCH_DATA_T *piio_conf_switch;
 int piio_conf_switch_count;
 
-ROLLSH_DATA_T *piio_conf_rollersh;
-int piio_conf_rollersh_count;
-
-static char *strdup_null(const char *s) {
-  if (s == NULL) {
-    return NULL;
-  }
-  return strdup(s);
-}
+ROLLSH_DATA_T *piio_conf_rollsh;
+int piio_conf_rollsh_count;
 
 int piio_conf_load(const char *file) {
   cfg_t *cfg;
   cfg_t *mqtt_cfg;
-  MQTT_CONF_DATA_T *mqtt;
-  cfg_t *sw_cfg;
   SWITCH_DATA_T *sw;
-  cfg_t *rollersh_cfg;
-  ROLLSH_DATA_T *rollersh;
+  ROLLSH_DATA_T *rollsh;
   int i;
   int err;
 
-  piio_conf_mqtt = NULL;
+  memset(&mqtt_conf, 0, sizeof(mqtt_conf));
   piio_conf_switch = NULL;
   piio_conf_switch_count = 0;
-  piio_conf_rollersh = NULL;
-  piio_conf_rollersh_count = 0;
+  piio_conf_rollsh = NULL;
+  piio_conf_rollsh_count = 0;
 
   cfg = cfg_init(opts, CFGF_NOCASE);
   if (cfg == NULL) {
@@ -95,34 +85,22 @@ int piio_conf_load(const char *file) {
     goto fail2;
   }
 
-  mqtt = calloc(1, sizeof(MQTT_CONF_DATA_T));
-  mqtt->topic = strdup_null(cfg_getstr(mqtt_cfg, "topic"));
-  mqtt->host = strdup_null(cfg_getstr(mqtt_cfg, "host"));
-  mqtt->port = cfg_getint(mqtt_cfg, "port");
-  mqtt->client_id = strdup_null(cfg_getstr(mqtt_cfg, "client_id"));
-  mqtt->username = strdup_null(cfg_getstr(mqtt_cfg, "user"));
-  mqtt->password = strdup_null(cfg_getstr(mqtt_cfg, "passwd"));
-  piio_conf_mqtt = mqtt;
+  mqtt_configure(mqtt_cfg);
 
   piio_conf_switch_count = cfg_size(cfg, "switch");
   piio_conf_switch = calloc(piio_conf_switch_count, sizeof(SWITCH_DATA_T));
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    sw_cfg = cfg_getnsec(cfg, "switch", i);
-    sw->name = strdup(cfg_title(sw_cfg));
-    sw->gpio = cfg_getint(sw_cfg, "gpio");
-    sw->on_time = cfg_getint(sw_cfg, "on_time");
+    if (switch_init(cfg_getnsec(cfg, "switch", i), sw) < 0) {
+      goto fail2;
+    }
   }
 
-  piio_conf_rollersh_count = cfg_size(cfg, "rollershutter");
-  piio_conf_rollersh = calloc(piio_conf_rollersh_count, sizeof(ROLLSH_DATA_T));
-  for (i = 0, rollersh = piio_conf_rollersh; i < piio_conf_rollersh_count; i++, rollersh++) {
-    rollersh_cfg = cfg_getnsec(cfg, "rollershutter", i);
-    rollersh->name = strdup(cfg_title(rollersh_cfg));
-    rollersh->gpio_up = cfg_getint(rollersh_cfg, "gpio_up");
-    rollersh->gpio_down = cfg_getint(rollersh_cfg, "gpio_down");
-    rollersh->time_full = cfg_getint(rollersh_cfg, "time_full");
-    rollersh->time_extra = cfg_getint(rollersh_cfg, "time_extra");
-    rollersh->time_pause = cfg_getint(rollersh_cfg, "time_pause");
+  piio_conf_rollsh_count = cfg_size(cfg, "rollershutter");
+  piio_conf_rollsh = calloc(piio_conf_rollsh_count, sizeof(ROLLSH_DATA_T));
+  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
+    if (rollsh_init(cfg_getnsec(cfg, "rollshutter", i), rollsh) < 0) {
+      goto fail2;
+    }
   }
 
   cfg_free(cfg);
@@ -138,31 +116,19 @@ fail0:
 
 void piio_conf_cleanup(void) {
   SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollersh;
+  ROLLSH_DATA_T *rollsh;
   int i;
 
-  for (i = 0, rollersh = piio_conf_rollersh; i < piio_conf_rollersh_count; i++, rollersh++) {
-    free((void *) rollersh->name);
+  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
+    rollsh_cleanup(rollsh);
   }
-  free((void *) piio_conf_rollersh);
-  piio_conf_rollersh = NULL;
-  piio_conf_rollersh_count = 0;
+  free((void *) piio_conf_rollsh);
 
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    free((void *) sw->name);
+    switch_cleanup(sw);
   }
-  free((void *) piio_conf_rollersh);
-  piio_conf_switch = NULL;
-  piio_conf_switch_count = 0;
+  free((void *) piio_conf_rollsh);
 
-  if (piio_conf_mqtt != NULL) {
-    free((void *) piio_conf_mqtt->topic);
-    free((void *) piio_conf_mqtt->host);
-    free((void *) piio_conf_mqtt->client_id);
-    free((void *) piio_conf_mqtt->username);
-    free((void *) piio_conf_mqtt->password);
-  }
-  free((void *) piio_conf_mqtt);
-  piio_conf_mqtt = NULL;
+  mqtt_unconfigure();
 }
 

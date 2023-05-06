@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     goto fail3;
   }
 
-  if (mqtt_startup(piio_conf_mqtt) < 0) {
+  if (mqtt_startup() < 0) {
     goto fail4;
   }
 

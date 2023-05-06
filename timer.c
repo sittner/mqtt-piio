@@ -1,4 +1,7 @@
 #include "timer.h"
+#include "piio_conf.h"
+#include "switch.h"
+#include "rollershutter.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -69,6 +72,9 @@ void timer_update_fds(fd_set *fd_set) {
 
 int timer_handler(fd_set *fd_set) {
   uint64_t u;
+  SWITCH_DATA_T *sw;
+  ROLLSH_DATA_T *rollsh;
+  int i;
 
   if (!FD_ISSET(timer_fd, fd_set)) {
     return 0;
@@ -79,7 +85,15 @@ int timer_handler(fd_set *fd_set) {
     return -1;
   }
 
-  // TODO
+  // process switches
+  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
+    switch_period(sw);
+  }
+
+  // process rollershutters
+  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
+    rollsh_period(rollsh);
+  }
 
   return 0;
 }
