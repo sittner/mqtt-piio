@@ -28,6 +28,7 @@ static void connect_callback(struct mosquitto *mosq, void *obj, int result) {
   // subscribe switches
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
     mosquitto_subscribe(mosq, NULL, sw->cmd_topic, 0);
+    mosquitto_subscribe(mosq, NULL, sw->state_topic, 0);
   }
 
   // subscribe rollershutters
@@ -54,27 +55,18 @@ static void message_callback(struct mosquitto *mosq, void *obj, const struct mos
   // process switches
   for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
     if (strcmp(sw->cmd_topic, msg->topic) == 0) {
-      if (strcmp("ON", buf) == 0) {
-        sw->cmd = 1;
-      }
-      if (strcmp("OFF", buf) == 0) {
-        sw->cmd = 0;
-      }
+      switch_cmd(sw, buf);
+    }
+    // restore last state
+    if (strcmp(sw->state_topic, msg->topic) == 0) {
+      switch_cmd(sw, buf);
     }
   }
 
   // process rollershutters
   for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
     if (strcmp(rollsh->cmd_topic, msg->topic) == 0) {
-      if (strcmp("OPEN", buf) == 0) {
-        rollsh->cmd = -1;
-      }
-      if (strcmp("CLOSE", buf) == 0) {
-        rollsh->cmd = 1;
-      }
-      if (strcmp("OFF", buf) == 0) {
-        rollsh->cmd = 0;
-      }
+      rollsh_cmd(rollsh, buf);
     }
   }
 }

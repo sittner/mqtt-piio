@@ -47,6 +47,18 @@ void rollsh_cleanup(ROLLSH_DATA_T *rollsh) {
   }
 }
 
+void rollsh_cmd(ROLLSH_DATA_T *rollsh, const char *cmd) {
+  if (strcmp("OPEN", cmd) == 0) {
+    rollsh->cmd = ROLLSH_CMD_OPEN;
+  }
+  if (strcmp("CLOSE", cmd) == 0) {
+    rollsh->cmd = ROLLSH_CMD_CLOSE;
+  }
+  if (strcmp("OFF", cmd) == 0) {
+    rollsh->cmd = ROLLSH_CMD_OFF;
+  }
+}
+
 void rollsh_period(ROLLSH_DATA_T *rollsh) {
 
 }
