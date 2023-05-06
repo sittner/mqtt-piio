@@ -8,6 +8,31 @@
 
 struct gpiod_chip *chips[MAX_CHIP_COUNT];
 
+#define PIN_COUNT 40
+
+static const int pinmap[PIN_COUNT] = {
+ -1, -1,
+  2, -1,
+  3, -1,
+  4, 14,
+ -1, 15,
+ 17, 18,
+ 27, -1,
+ 22, 23,
+ -1, 24,
+ 10, -2,
+  9, 25,
+ 11,  8,
+ -1,  7,
+ -1, -1,
+  5, -1,
+  6, 12,
+ 13, -1,
+ 19, 16,
+ 26, 20,
+ -1, 21
+};
+
 int gpio_init(void) {
   memset(chips, 0, sizeof(chips));
 
@@ -53,13 +78,22 @@ static struct gpiod_chip *get_chip_by_number(int num) {
   return chip;
 }
 
-struct gpiod_line *gpio_request_output(int gpio, const char *name) {
-  int chip_no, line_no;
+struct gpiod_line *gpio_request_output(int pin, const char *name) {
+  int gpio, chip_no, line_no;
   struct gpiod_chip *chip;
   struct gpiod_line *line;
 
-  chip_no = gpio / 32;
-  line_no = gpio % 32;
+  gpio = -1;
+  if (pin >= 1 && pin <= PIN_COUNT) {
+    gpio = pinmap[pin - 1];
+  }
+  if (gpio < 0) {
+    syslog(LOG_ERR, "Infalid gpio pin number %d.", pin);
+    return NULL;
+  }
+
+  chip_no = gpio / 64;
+  line_no = gpio % 64;
 
   chip = get_chip_by_number(chip_no);
   if (chip == NULL) {
@@ -68,12 +102,12 @@ struct gpiod_line *gpio_request_output(int gpio, const char *name) {
 
   line = gpiod_chip_get_line(chip, line_no);
   if (line == NULL) {
-    syslog(LOG_ERR, "Failed to get line %d:%d for gpio %d.", chip_no, line_no, gpio);
+    syslog(LOG_ERR, "Failed to get line %d:%d for pin %d.", chip_no, line_no, pin);
     return NULL;
   }
 
   if (gpiod_line_request_output(line, name, 0) < 0) {
-    syslog(LOG_ERR, "Failed to request output line %d:%d for gpio %d.", chip_no, line_no, gpio);
+    syslog(LOG_ERR, "Failed to request output line %d:%d for pin %d.", chip_no, line_no, pin);
     return NULL;
   }
 

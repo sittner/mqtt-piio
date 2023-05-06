@@ -8,15 +8,15 @@
 
 int switch_init(cfg_t *cfg, SWITCH_DATA_T *sw) {
   sw->name = strdup(cfg_title(cfg));
-  sw->gpio = cfg_getint(cfg, "gpio");
+  sw->pin = cfg_getint(cfg, "pin");
   sw->on_time = cfg_getint(cfg, "on_time");
 
   asprintf((char **) &sw->cmd_topic, "%s/%s/cmd", mqtt_conf.base_topic, sw->name);
   asprintf((char **) &sw->state_topic, "%s/%s/state", mqtt_conf.base_topic, sw->name);
 
-  asprintf((char **) &sw->gpio_name, "piio.sw.%s", sw->name);
-  sw->gpio_line = gpio_request_output(sw->gpio, sw->gpio_name);
-  if (sw->gpio_line == NULL) {
+  asprintf((char **) &sw->pin_name, "piio.%s", sw->name);
+  sw->pin_line = gpio_request_output(sw->pin, sw->pin_name);
+  if (sw->pin_line == NULL) {
     return -1;
   }
 
@@ -27,10 +27,10 @@ void switch_cleanup(SWITCH_DATA_T *sw) {
   free((void *) sw->name);
   free((void *) sw->cmd_topic);
   free((void *) sw->state_topic);
-  free((void *) sw->gpio_name);
+  free((void *) sw->pin_name);
 
-  if (sw->gpio_line != NULL) {
-    gpiod_line_release(sw->gpio_line);
+  if (sw->pin_line != NULL) {
+    gpiod_line_release(sw->pin_line);
   }
 }
 

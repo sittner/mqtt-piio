@@ -6,7 +6,7 @@
 int gpio_init(void);
 void gpio_cleanup(void);
 
-struct gpiod_line *gpio_request_output(int gpio, const char *name);
+struct gpiod_line *gpio_request_output(int pin, const char *name);
 
 #endif
 

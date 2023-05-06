@@ -6,8 +6,8 @@
 
 typedef struct {
   const char *name;
-  int gpio_up;
-  int gpio_down;
+  int pin_up;
+  int pin_down;
   int time_full;
   int time_extra;
   int time_pause;
@@ -15,10 +15,10 @@ typedef struct {
   const char *cmd_topic;
   const char *state_topic;
 
-  const char *gpio_up_name;
-  struct gpiod_line *gpio_up_line;
-  const char *gpio_down_name;
-  struct gpiod_line *gpio_down_line;
+  const char *pin_up_name;
+  struct gpiod_line *pin_up_line;
+  const char *pin_down_name;
+  struct gpiod_line *pin_down_line;
 
   int cmd;
 

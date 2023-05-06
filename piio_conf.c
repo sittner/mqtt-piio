@@ -18,14 +18,14 @@ static cfg_opt_t mqtt_opts[] = {
 };
 
 static cfg_opt_t switch_opts[] = {
-  CFG_INT("gpio", 1, CFGF_NONE),
+  CFG_INT("pin", 1, CFGF_NONE),
   CFG_INT("on_time", 0, CFGF_NONE),
   CFG_END()
 };
 
 static cfg_opt_t rollsh_opts[] = {
-  CFG_INT("gpio_up", 1, CFGF_NONE),
-  CFG_INT("gpio_down", 2, CFGF_NONE),
+  CFG_INT("pin_up", 1, CFGF_NONE),
+  CFG_INT("pin_down", 2, CFGF_NONE),
   CFG_INT("time_full", 10000, CFGF_NONE),
   CFG_INT("time_extra", 1000, CFGF_NONE),
   CFG_INT("time_pause", 1000, CFGF_NONE),

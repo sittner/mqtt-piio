@@ -6,13 +6,13 @@
 
 typedef struct {
   const char *name;
-  int gpio;
+  int pin;
 
   const char *cmd_topic;
   const char *state_topic;
 
-  const char *gpio_name;
-  struct gpiod_line *gpio_line;
+  const char *pin_name;
+  struct gpiod_line *pin_line;
 
   int cmd;
 
