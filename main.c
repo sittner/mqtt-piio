@@ -16,6 +16,8 @@
 #include <sys/timerfd.h>
 #include <sys/eventfd.h>
 
+#define DEFAULT_CFG_FILE "/etc/piio.conf"
+
 static bool exit_flag;
 
 static void sighandler(int sig)
@@ -36,8 +38,14 @@ static void sighandler(int sig)
 int main(int argc, char **argv)
 {
   int ret = 1;
+  const char *cfg_file;
   int err;
   struct sigaction act;
+
+  cfg_file = DEFAULT_CFG_FILE;
+  if (argc >= 2) {
+    cfg_file = argv[1];
+  }
 
   // install signal handler
   exit_flag = false;
@@ -51,8 +59,7 @@ int main(int argc, char **argv)
     goto fail_gpio;
   }
 
-  // TODO: parameter
-  if (piio_conf_load("piio.conf") < 0) {
+  if (piio_conf_load(cfg_file) < 0) {
     goto fail_conf;
   }
 
