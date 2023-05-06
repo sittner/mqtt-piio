@@ -2,6 +2,7 @@
 #define _ROLLERSHUTTER_H_
 
 #include <confuse.h>
+#include <gpiod.h>
 
 typedef struct {
   const char *name;
@@ -13,6 +14,11 @@ typedef struct {
 
   const char *cmd_topic;
   const char *state_topic;
+
+  const char *gpio_up_name;
+  struct gpiod_line *gpio_up_line;
+  const char *gpio_down_name;
+  struct gpiod_line *gpio_down_line;
 
   int cmd;
 

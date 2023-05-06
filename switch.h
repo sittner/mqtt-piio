@@ -2,6 +2,7 @@
 #define _SWITCH_H
 
 #include <confuse.h>
+#include <gpiod.h>
 
 typedef struct {
   const char *name;
@@ -9,6 +10,9 @@ typedef struct {
 
   const char *cmd_topic;
   const char *state_topic;
+
+  const char *gpio_name;
+  struct gpiod_line *gpio_line;
 
   int cmd;
 

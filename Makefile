@@ -6,6 +6,7 @@ SRC = \
 	main.c \
 	piio_conf.c \
 	timer.c \
+	gpio.c \
 	mqtt.c \
 	switch.c \
 	rollershutter.c \
@@ -18,7 +19,7 @@ CFLAGS += -I.
 
 CFLAGS += -Wall
 
-LIBS += -lconfuse -lmosquitto
+LIBS += -lgpiod -lconfuse -lmosquitto
 
 .PHONY: all clean realclean install
 

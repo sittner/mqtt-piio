@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+#include "gpio.h"
 #include "piio_conf.h"
 #include "timer.h"
 #include "mqtt.h"
@@ -46,17 +47,21 @@ int main(int argc, char **argv)
   sigaction(SIGTERM, &act, NULL);
   sigaction(SIGHUP, &act, NULL);
 
+  if (gpio_init() < 0) {
+    goto fail_gpio;
+  }
+
   // TODO: parameter
   if (piio_conf_load("piio.conf") < 0) {
-    goto fail0;
+    goto fail_conf;
   }
 
   if (timer_startup() < 0) {
-    goto fail3;
+    goto fail_timer;
   }
 
   if (mqtt_startup() < 0) {
-    goto fail4;
+    goto fail_mqtt;
   }
 
   while(!exit_flag) {
@@ -70,25 +75,27 @@ int main(int argc, char **argv)
         continue;
       }
       syslog(LOG_ERR, "Failed on socket select (error %d)", errno);
-      goto fail6;
+      goto fail;
     }
 
     // check task timers
     if (timer_handler(&read_fd_set) < 0) {
-      goto fail6;
+      goto fail;
     }
 
   }
     
   ret = 0;
 
-fail6:
+fail:
   mqtt_shutdown();
-fail4:
+fail_mqtt:
   timer_shutdown();
-fail3:
+fail_timer:
   piio_conf_cleanup();
-fail0:
+fail_conf:
+  gpio_cleanup();
+fail_gpio:
   return ret;
 }
 
