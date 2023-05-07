@@ -1,8 +1,10 @@
 #include "rollershutter.h"
 #include "mqtt.h"
 #include "gpio.h"
+#include "timer.h"
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
 int rollsh_init(cfg_t *cfg, ROLLSH_DATA_T *rollsh) {
@@ -28,6 +30,9 @@ int rollsh_init(cfg_t *cfg, ROLLSH_DATA_T *rollsh) {
     return -1;
   }
 
+  rollsh->do_restore = 1;
+  rollsh->last_pos = -1;
+
   return 0;
 }
 
@@ -48,6 +53,8 @@ void rollsh_cleanup(ROLLSH_DATA_T *rollsh) {
 }
 
 void rollsh_cmd(ROLLSH_DATA_T *rollsh, const char *cmd) {
+  rollsh->do_restore = 0;
+
   if (strcmp("OPEN", cmd) == 0) {
     rollsh->cmd = ROLLSH_CMD_OPEN;
   }
@@ -59,7 +66,84 @@ void rollsh_cmd(ROLLSH_DATA_T *rollsh, const char *cmd) {
   }
 }
 
-void rollsh_period(ROLLSH_DATA_T *rollsh) {
+static int limit_pct(int val) {
+  if (val < 0) {
+    return 0;
+  }
 
+  if (val > 100) {
+    return 100;
+  }
+
+  return val;
+}
+
+void rollsh_restore(ROLLSH_DATA_T *rollsh, const char *cmd) {
+  if (!rollsh->do_restore) {
+    return;
+  }
+
+  rollsh->do_restore = 0;
+  rollsh->position = limit_pct(atoi(cmd)) * rollsh->time_full / 100;
+}
+
+static void handle_cmd(ROLLSH_DATA_T *rollsh, int cmd, int other, int *timer) {
+  if (rollsh->output == other) {
+    *timer = rollsh->time_pause;
+  }
+
+  if (*timer > 0) {
+    *timer -= TIMER_PERIOD_MS;
+    return;
+  }
+
+  if (rollsh->cmd == cmd) {
+    rollsh->cmd = ROLLSH_CMD_NOP;
+    rollsh->output = cmd;
+  }
+}
+
+void rollsh_period(ROLLSH_DATA_T *rollsh) {
+  int pos;
+
+  // handle commands
+  handle_cmd(rollsh, ROLLSH_CMD_CLOSE, ROLLSH_CMD_OPEN, &rollsh->down_timer);
+  handle_cmd(rollsh, ROLLSH_CMD_OPEN, ROLLSH_CMD_CLOSE, &rollsh->up_timer);
+  if (rollsh->cmd != ROLLSH_CMD_NOP) {
+    rollsh->output = ROLLSH_CMD_NOP;
+  }
+  if (rollsh->cmd == ROLLSH_CMD_OFF) {
+    rollsh->cmd = ROLLSH_CMD_NOP;
+  }
+
+  // update position
+  if (rollsh->output == ROLLSH_CMD_CLOSE) {
+    rollsh->position += TIMER_PERIOD_MS;
+    if (rollsh->position >= (rollsh->time_full + rollsh->time_extra)) {
+      rollsh->output = ROLLSH_CMD_NOP;
+      rollsh->position = rollsh->time_full;
+    }
+  }
+  if (rollsh->output == ROLLSH_CMD_OPEN) {
+    rollsh->position -= TIMER_PERIOD_MS;
+    if (rollsh->position <= (0 - rollsh->time_extra)) {
+      rollsh->output = ROLLSH_CMD_NOP;
+      rollsh->position = 0;
+    }
+  }
+
+  // report state
+  pos = 0;
+  if (rollsh->time_full > 0) {
+    pos = limit_pct(rollsh->position * 100 / rollsh->time_full);
+  }
+  if (!rollsh->do_restore && pos != rollsh->last_pos) {
+    rollsh->last_pos = pos;
+    mqtt_publish_int(rollsh->state_topic, pos);
+  }
+
+  // set putputs
+  gpiod_line_set_value(rollsh->pin_up_line, (rollsh->output == ROLLSH_CMD_OPEN));
+  gpiod_line_set_value(rollsh->pin_down_line, (rollsh->output == ROLLSH_CMD_CLOSE));
 }
 

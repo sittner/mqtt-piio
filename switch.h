@@ -6,7 +6,7 @@
 
 #define SWITCH_CMD_NOP  0
 #define SWITCH_CMD_ON   1
-#define SWITCH_CMD_OFF -1
+#define SWITCH_CMD_OFF  2
 
 typedef struct {
   const char *name;
@@ -30,6 +30,7 @@ int switch_init(cfg_t *cfg, SWITCH_DATA_T *sw);
 void switch_cleanup(SWITCH_DATA_T *sw);
 
 void switch_cmd(SWITCH_DATA_T *sw, const char *cmd);
+void switch_restore(SWITCH_DATA_T *sw, const char *cmd);
 
 void switch_period(SWITCH_DATA_T *sw);
 

@@ -39,12 +39,21 @@ void switch_cleanup(SWITCH_DATA_T *sw) {
 
 void switch_cmd(SWITCH_DATA_T *sw, const char *cmd) {
   sw->do_restore = 0;
+
   if (strcmp("ON", cmd) == 0) {
     sw->cmd = SWITCH_CMD_ON;
   }
   if (strcmp("OFF", cmd) == 0) {
     sw->cmd = SWITCH_CMD_OFF;
   }
+}
+
+void switch_restore(SWITCH_DATA_T *sw, const char *cmd) {
+  if (!sw->do_restore) {
+    return;
+  }
+
+  switch_cmd(sw, cmd);
 }
 
 void switch_period(SWITCH_DATA_T *sw) {
