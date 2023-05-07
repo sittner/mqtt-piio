@@ -5,7 +5,7 @@
 #include <gpiod.h>
 
 #define ROLLSH_CMD_NOP    0
-#define ROLLSH_CMD_OFF    1
+#define ROLLSH_CMD_STOP   1
 #define ROLLSH_CMD_OPEN   2
 #define ROLLSH_CMD_CLOSE  3
 

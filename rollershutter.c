@@ -61,8 +61,8 @@ void rollsh_cmd(ROLLSH_DATA_T *rollsh, const char *cmd) {
   if (strcmp("CLOSE", cmd) == 0) {
     rollsh->cmd = ROLLSH_CMD_CLOSE;
   }
-  if (strcmp("OFF", cmd) == 0) {
-    rollsh->cmd = ROLLSH_CMD_OFF;
+  if (strcmp("STOP", cmd) == 0) {
+    rollsh->cmd = ROLLSH_CMD_STOP;
   }
 }
 
@@ -112,7 +112,7 @@ void rollsh_period(ROLLSH_DATA_T *rollsh) {
   if (rollsh->cmd != ROLLSH_CMD_NOP) {
     rollsh->output = ROLLSH_CMD_NOP;
   }
-  if (rollsh->cmd == ROLLSH_CMD_OFF) {
+  if (rollsh->cmd == ROLLSH_CMD_STOP) {
     rollsh->cmd = ROLLSH_CMD_NOP;
   }
 
