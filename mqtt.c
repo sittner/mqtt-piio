@@ -130,13 +130,13 @@ int mqtt_startup(void) {
     goto fail2;
   }
 
-  if (mosquitto_connect_async(mosq, mqtt_conf.host, mqtt_conf.port, KEEPALIVE_PERIOD)) {
-    syslog(LOG_INFO, "initial mqtt connection failed");
-  }
-
   if (mosquitto_loop_start(mosq)) {
     syslog(LOG_ERR, "Failed to start mosquitto thread");
     goto fail3;
+  }
+
+  if (mosquitto_connect_async(mosq, mqtt_conf.host, mqtt_conf.port, KEEPALIVE_PERIOD)) {
+    syslog(LOG_INFO, "initial mqtt connection failed");
   }
 
   return 0;
