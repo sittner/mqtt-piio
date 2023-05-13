@@ -37,7 +37,7 @@ void rollsh_init(void) {
 }
 
 int rollsh_configure(cfg_t *cfg) {
-  return piio_conf_config_childs(cfg, "rollsh", &rollshs_count, (void *) &rollshs, sizeof(ROLLSH_DATA_T), NULL, configure_instance);
+  return piio_conf_config_childs(cfg, "rollershutter", &rollshs_count, (void *) &rollshs, sizeof(ROLLSH_DATA_T), NULL, configure_instance);
 }
 
 void rollsh_unconfigure(void) {
