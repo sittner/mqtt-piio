@@ -72,9 +72,6 @@ void timer_update_fds(fd_set *fd_set) {
 
 int timer_handler(fd_set *fd_set) {
   uint64_t u;
-  SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollsh;
-  int i;
 
   if (!FD_ISSET(timer_fd, fd_set)) {
     return 0;
@@ -86,14 +83,10 @@ int timer_handler(fd_set *fd_set) {
   }
 
   // process switches
-  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    switch_period(sw);
-  }
+  switch_period();
 
   // process rollershutters
-  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    rollsh_period(rollsh);
-  }
+  rollsh_period();
 
   return 0;
 }

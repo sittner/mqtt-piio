@@ -2,6 +2,7 @@
 #include "piio_conf.h"
 #include "switch.h"
 #include "rollershutter.h"
+#include "piio_conf.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,30 +20,17 @@ MQTT_CONF_DATA_T mqtt_conf;
 static struct mosquitto *mosq = NULL;
 
 static void connect_callback(struct mosquitto *mosq, void *obj, int result) {
-  SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollsh;
-  int i;
-
   mosquitto_publish(mosq, NULL, mqtt_conf.status_topic, CONST_STR_PAYLOAD("ON"), 1, true);
 
   // subscribe switches
-  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    mosquitto_subscribe(mosq, NULL, sw->cmd_topic, 0);
-    mosquitto_subscribe(mosq, NULL, sw->state_topic, 0);
-  }
+  switch_mqtt_subscribe(mosq);
 
   // subscribe rollershutters
-  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    mosquitto_subscribe(mosq, NULL, rollsh->cmd_topic, 0);
-    mosquitto_subscribe(mosq, NULL, rollsh->state_topic, 0);
-  }
+  rollsh_mqtt_subscribe(mosq);
 }
 
 static void message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
   char buf[32];
-  SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollsh;
-  int i;
 
   // check for maximum payload length
   if (msg->payloadlen >= (sizeof(buf) - 1)) {
@@ -54,44 +42,35 @@ static void message_callback(struct mosquitto *mosq, void *obj, const struct mos
   buf[msg->payloadlen] = 0;
 
   // process switches
-  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    if (strcmp(sw->cmd_topic, msg->topic) == 0) {
-      switch_cmd(sw, buf);
-    }
-    // restore last state
-    if (strcmp(sw->state_topic, msg->topic) == 0) {
-      switch_restore(sw, buf);
-    }
-  }
+  switch_mqtt_msg(msg->topic, buf);
 
   // process rollershutters
-  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    if (strcmp(rollsh->cmd_topic, msg->topic) == 0) {
-      rollsh_cmd(rollsh, buf);
-    }
-    // restore last state
-    if (strcmp(rollsh->state_topic, msg->topic) == 0) {
-      rollsh_restore(rollsh, buf);
-    }
-  }
+  rollsh_mqtt_msg(msg->topic, buf);
 }
 
-static char *strdup_null(const char *s) {
-  if (s == NULL) {
-    return NULL;
-  }
-  return strdup(s);
+void mqtt_init(void) {
+  memset(&mqtt_conf, 0, sizeof(mqtt_conf));
 }
 
-void mqtt_configure(cfg_t *cfg) {
-  mqtt_conf.base_topic = strdup(cfg_getstr(cfg, "topic"));
-  mqtt_conf.host = strdup(cfg_getstr(cfg, "host"));
-  mqtt_conf.port = cfg_getint(cfg, "port");
-  mqtt_conf.client_id = strdup_null(cfg_getstr(cfg, "client_id"));
-  mqtt_conf.username = strdup_null(cfg_getstr(cfg, "user"));
-  mqtt_conf.password = strdup_null(cfg_getstr(cfg, "passwd"));
+int mqtt_configure(cfg_t *cfg) {
+  cfg_t *mqtt_cfg;
+
+  mqtt_cfg = cfg_getsec(cfg, "mqtt");
+  if (mqtt_cfg == NULL) {
+    syslog(LOG_ERR, "ERROR: no mqtt config found.");
+    return -1;
+  }
+
+  mqtt_conf.base_topic = piio_conf_strdup(cfg_getstr(mqtt_cfg, "topic"));
+  mqtt_conf.host = piio_conf_strdup(cfg_getstr(mqtt_cfg, "host"));
+  mqtt_conf.port = cfg_getint(mqtt_cfg, "port");
+  mqtt_conf.client_id = piio_conf_strdup(cfg_getstr(mqtt_cfg, "client_id"));
+  mqtt_conf.username = piio_conf_strdup(cfg_getstr(mqtt_cfg, "user"));
+  mqtt_conf.password = piio_conf_strdup(cfg_getstr(mqtt_cfg, "passwd"));
 
   asprintf((char **) &mqtt_conf.status_topic, "%s/status", mqtt_conf.base_topic);
+
+  return 0;
 }
 
 void mqtt_unconfigure(void) {

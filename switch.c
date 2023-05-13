@@ -2,13 +2,19 @@
 #include "mqtt.h"
 #include "gpio.h"
 #include "timer.h"
+#include "piio_conf.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 
-int switch_init(cfg_t *cfg, SWITCH_DATA_T *sw) {
-  sw->name = strdup(cfg_title(cfg));
+static int switches_count;
+static SWITCH_DATA_T *switches;
+
+static int configure_instance(cfg_t *cfg, void *ctx, void *child) {
+  SWITCH_DATA_T *sw = (SWITCH_DATA_T *) child;
+
+  sw->name = piio_conf_strdup(cfg_title(cfg));
   sw->pin = cfg_getint(cfg, "pin");
   sw->on_time = cfg_getint(cfg, "on_time");
 
@@ -16,28 +22,70 @@ int switch_init(cfg_t *cfg, SWITCH_DATA_T *sw) {
   asprintf((char **) &sw->state_topic, "%s/%s/state", mqtt_conf.base_topic, sw->name);
 
   asprintf((char **) &sw->pin_name, "piio.%s", sw->name);
-  sw->pin_line = gpio_request_output(sw->pin, sw->pin_name);
-  if (sw->pin_line == NULL) {
-    return -1;
-  }
-
-  sw->do_restore = 1;
 
   return 0;
 }
 
-void switch_cleanup(SWITCH_DATA_T *sw) {
-  free((void *) sw->name);
-  free((void *) sw->cmd_topic);
-  free((void *) sw->state_topic);
-  free((void *) sw->pin_name);
+void switch_init(void) {
+  switches_count = 0;
+  switches = NULL;
+}
 
-  if (sw->pin_line != NULL) {
-    gpiod_line_release(sw->pin_line);
+int switch_configure(cfg_t *cfg) {
+  return piio_conf_config_childs(cfg, "switch", &switches_count, (void *) &switches, sizeof(SWITCH_DATA_T), NULL, configure_instance);
+}
+
+void switch_unconfigure(void) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    free((void *) sw->name);
+    free((void *) sw->cmd_topic);
+    free((void *) sw->state_topic);
+    free((void *) sw->pin_name);
+  }
+  free((void *) switches);
+}
+
+int switch_startup(void) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    sw->pin_line = gpio_request_output(sw->pin, sw->pin_name);
+    if (sw->pin_line == NULL) {
+      return -1;
+    }
+
+    sw->do_restore = 1;
+  }
+
+  return 0;
+}
+
+void switch_shutdown(void) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    if (sw->pin_line != NULL) {
+      gpiod_line_release(sw->pin_line);
+    }
   }
 }
 
-void switch_cmd(SWITCH_DATA_T *sw, const char *cmd) {
+void switch_mqtt_subscribe(struct mosquitto *mosq) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    mosquitto_subscribe(mosq, NULL, sw->cmd_topic, 0);
+    mosquitto_subscribe(mosq, NULL, sw->state_topic, 0);
+  }
+}
+
+static void instance_cmd(SWITCH_DATA_T *sw, const char *cmd) {
   sw->do_restore = 0;
 
   if (strcmp("ON", cmd) == 0) {
@@ -48,15 +96,30 @@ void switch_cmd(SWITCH_DATA_T *sw, const char *cmd) {
   }
 }
 
-void switch_restore(SWITCH_DATA_T *sw, const char *cmd) {
+static void instance_restore(SWITCH_DATA_T *sw, const char *cmd) {
   if (!sw->do_restore) {
     return;
   }
 
-  switch_cmd(sw, cmd);
+  instance_cmd(sw, cmd);
 }
 
-void switch_period(SWITCH_DATA_T *sw) {
+void switch_mqtt_msg(const char *topic, const char *msg) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    if (strcmp(sw->cmd_topic, topic) == 0) {
+      instance_cmd(sw, msg);
+    }
+    // restore last state
+    if (strcmp(sw->state_topic, topic) == 0) {
+      instance_restore(sw, msg);
+    }
+  }
+}
+
+static void instance_period(SWITCH_DATA_T *sw) {
   int last_output;
 
   last_output = sw->output;
@@ -85,3 +148,11 @@ void switch_period(SWITCH_DATA_T *sw) {
   gpiod_line_set_value(sw->pin_line, sw->output);
 }
 
+void switch_period(void) {
+  int i;
+  SWITCH_DATA_T *sw;
+
+  for (i = 0, sw = switches; i < switches_count; i++, sw++) {
+    instance_period(sw);
+  }
+}

@@ -18,7 +18,8 @@ typedef struct {
 
 extern MQTT_CONF_DATA_T mqtt_conf;
 
-void mqtt_configure(cfg_t *cfg);
+void mqtt_init(void);
+int mqtt_configure(cfg_t *cfg);
 void mqtt_unconfigure(void);
 
 int mqtt_startup(void);

@@ -4,6 +4,8 @@
 #include "piio_conf.h"
 #include "timer.h"
 #include "mqtt.h"
+#include "switch.h"
+#include "rollershutter.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -63,6 +65,14 @@ int main(int argc, char **argv)
     goto fail_conf;
   }
 
+  if (switch_startup() < 0) {
+    goto fail_switch;
+  }
+
+  if (rollsh_startup() < 0) {
+    goto fail_rollsh;
+  }
+
   if (timer_startup() < 0) {
     goto fail_timer;
   }
@@ -91,7 +101,7 @@ int main(int argc, char **argv)
     }
 
   }
-    
+
   ret = 0;
 
 fail:
@@ -99,6 +109,10 @@ fail:
 fail_mqtt:
   timer_shutdown();
 fail_timer:
+  rollsh_shutdown();
+fail_rollsh:
+  switch_shutdown();
+fail_switch:
   piio_conf_cleanup();
 fail_conf:
   gpio_cleanup();

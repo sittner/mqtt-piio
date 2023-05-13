@@ -3,6 +3,7 @@
 
 #include <confuse.h>
 #include <gpiod.h>
+#include <mosquitto.h>
 
 #define ROLLSH_CMD_NOP    0
 #define ROLLSH_CMD_STOP   1
@@ -36,13 +37,17 @@ typedef struct {
 
 } ROLLSH_DATA_T;
 
-int rollsh_init(cfg_t *cfg, ROLLSH_DATA_T *rollsh);
-void rollsh_cleanup(ROLLSH_DATA_T *rollsh);
+void rollsh_init(void);
+int rollsh_configure(cfg_t *cfg);
+void rollsh_unconfigure(void);
 
-void rollsh_cmd(ROLLSH_DATA_T *rollsh, const char *cmd);
-void rollsh_restore(ROLLSH_DATA_T *rollsh, const char *cmd);
+int rollsh_startup(void);
+void rollsh_shutdown(void);
 
-void rollsh_period(ROLLSH_DATA_T *rollsh);
+void rollsh_mqtt_subscribe(struct mosquitto *mosq);
+void rollsh_mqtt_msg(const char *topic, const char *msg);
+
+void rollsh_period(void);
 
 #endif
 

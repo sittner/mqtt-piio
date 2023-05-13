@@ -3,6 +3,7 @@
 
 #include <confuse.h>
 #include <gpiod.h>
+#include <mosquitto.h>
 
 #define SWITCH_CMD_NOP  0
 #define SWITCH_CMD_ON   1
@@ -26,13 +27,17 @@ typedef struct {
   int on_timer;
 } SWITCH_DATA_T;
 
-int switch_init(cfg_t *cfg, SWITCH_DATA_T *sw);
-void switch_cleanup(SWITCH_DATA_T *sw);
+void switch_init(void);
+int switch_configure(cfg_t *cfg);
+void switch_unconfigure(void);
 
-void switch_cmd(SWITCH_DATA_T *sw, const char *cmd);
-void switch_restore(SWITCH_DATA_T *sw, const char *cmd);
+int switch_startup(void);
+void switch_shutdown(void);
 
-void switch_period(SWITCH_DATA_T *sw);
+void switch_mqtt_subscribe(struct mosquitto *mosq);
+void switch_mqtt_msg(const char *topic, const char *msg);
+
+void switch_period(void);
 
 #endif
 

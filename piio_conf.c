@@ -1,8 +1,9 @@
 #include "piio_conf.h"
 
 #include "mqtt.h"
+#include "switch.h"
+#include "rollershutter.h"
 
-#include <confuse.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -32,36 +33,20 @@ static cfg_opt_t rollsh_opts[] = {
   CFG_END()
 };
 
-#define SECT_MQTT   "mqtt"
-#define SECT_SWITCH "switch"
-#define SECT_ROLLSH "rollershutter"
-
 static cfg_opt_t opts[] = {
-  CFG_SEC(SECT_MQTT, mqtt_opts, CFGF_NONE),
-  CFG_SEC(SECT_SWITCH, switch_opts, CFGF_MULTI | CFGF_TITLE),
-  CFG_SEC(SECT_ROLLSH, rollsh_opts, CFGF_MULTI | CFGF_TITLE),
+  CFG_SEC("mqtt", mqtt_opts, CFGF_NONE),
+  CFG_SEC("switch", switch_opts, CFGF_MULTI | CFGF_TITLE),
+  CFG_SEC("rollershutter", rollsh_opts, CFGF_MULTI | CFGF_TITLE),
   CFG_END()
 };
 
-SWITCH_DATA_T *piio_conf_switch;
-int piio_conf_switch_count;
-
-ROLLSH_DATA_T *piio_conf_rollsh;
-int piio_conf_rollsh_count;
-
 int piio_conf_load(const char *file) {
   cfg_t *cfg;
-  cfg_t *mqtt_cfg;
-  SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollsh;
-  int i;
   int err;
 
-  memset(&mqtt_conf, 0, sizeof(mqtt_conf));
-  piio_conf_switch = NULL;
-  piio_conf_switch_count = 0;
-  piio_conf_rollsh = NULL;
-  piio_conf_rollsh_count = 0;
+  mqtt_init();
+  switch_init();
+  rollsh_init();
 
   cfg = cfg_init(opts, CFGF_NOCASE);
   if (cfg == NULL) {
@@ -83,28 +68,16 @@ int piio_conf_load(const char *file) {
     goto fail1;
   }
 
-  mqtt_cfg = cfg_getsec(cfg, SECT_MQTT);
-  if (mqtt_cfg == NULL) {
-    syslog(LOG_ERR, "ERROR: no mqtt config found in %s.", file);
+  if (mqtt_configure(cfg) < 0) {
     goto fail2;
   }
 
-  mqtt_configure(mqtt_cfg);
-
-  piio_conf_switch_count = cfg_size(cfg, SECT_SWITCH);
-  piio_conf_switch = calloc(piio_conf_switch_count, sizeof(SWITCH_DATA_T));
-  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    if (switch_init(cfg_getnsec(cfg, SECT_SWITCH, i), sw) < 0) {
-      goto fail2;
-    }
+  if (switch_configure(cfg) < 0) {
+    goto fail2;
   }
 
-  piio_conf_rollsh_count = cfg_size(cfg, SECT_ROLLSH);
-  piio_conf_rollsh = calloc(piio_conf_rollsh_count, sizeof(ROLLSH_DATA_T));
-  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    if (rollsh_init(cfg_getnsec(cfg, SECT_ROLLSH, i), rollsh) < 0) {
-      goto fail2;
-    }
+  if (rollsh_configure(cfg) < 0) {
+    goto fail2;
   }
 
   cfg_free(cfg);
@@ -119,20 +92,46 @@ fail0:
 }
 
 void piio_conf_cleanup(void) {
-  SWITCH_DATA_T *sw;
-  ROLLSH_DATA_T *rollsh;
-  int i;
-
-  for (i = 0, rollsh = piio_conf_rollsh; i < piio_conf_rollsh_count; i++, rollsh++) {
-    rollsh_cleanup(rollsh);
-  }
-  free((void *) piio_conf_rollsh);
-
-  for (i = 0, sw = piio_conf_switch; i < piio_conf_switch_count; i++, sw++) {
-    switch_cleanup(sw);
-  }
-  free((void *) piio_conf_switch);
-
+  rollsh_unconfigure();
+  switch_unconfigure();
   mqtt_unconfigure();
+}
+
+int piio_conf_config_childs(cfg_t *cfg, const char *name, int *count, void **data, int size, void *ctx, PIIO_CONF_CONFIG_CHILD_CB cccb) {
+  int n, i;
+  void *child;
+
+  *count = 0;
+  *data = NULL;
+
+  n = cfg_size(cfg, name);
+  if (n == 0) {
+    return 0;
+  }
+
+  child = calloc(n, size);
+  if (child == NULL) {
+    syslog(LOG_ERR, "Failed to allocate child's data.");
+    return -1;
+  }
+
+  *count = n;
+  *data = child;
+
+  for (i = 0; i < n; i++, child += size) {
+    if (cccb(cfg_getnsec(cfg, name, i), ctx, child) < 0) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+char *piio_conf_strdup(const char *s) {
+  if (s == NULL) {
+    return NULL;
+  }
+
+  return strdup(s);
 }
 
